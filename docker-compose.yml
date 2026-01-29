@@ -1,5 +1,8 @@
 services:
   moltbot-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ${CLAWDBOT_IMAGE:-moltbot:local}
     environment:
       HOME: /home/node
