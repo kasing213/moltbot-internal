@@ -2,4 +2,4 @@
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "node dist/index.js gateway --bind lan --port 18789 --allow-unconfigured --token $CLAWDBOT_GATEWAY_TOKEN"
+startCommand = "sh -c 'node dist/index.js gateway --bind lan --port ${PORT:-18789} --allow-unconfigured --token ${CLAWDBOT_GATEWAY_TOKEN}'"
