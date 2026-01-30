@@ -348,6 +348,44 @@ const processMediaGroup = async (entry) => {
 
 ## Troubleshooting Guide
 
+### Common Deployment Errors
+
+#### 502 Bad Gateway on `/`
+
+**Symptoms:** Railway shows `GET /` returning 502
+
+**Cause:** This is expected during startup. The root path `/` has no handler - Railway's health check uses `/health` instead.
+
+**Resolution:** No action needed. Check that `/health` returns 200. The 502 on `/` is normal.
+
+#### 409 getUpdates Conflict
+
+**Symptoms:**
+```
+getUpdates conflict: terminated by other getUpdates request
+```
+
+**Cause:** Another bot instance is already polling Telegram. Only one instance can poll at a time.
+
+**Resolution:**
+1. Stop any local `moltbot gateway` processes
+2. Check for duplicate Railway deployments
+3. Wait 30s for old connections to timeout, then redeploy
+
+#### Telegram Configured But Not Enabled
+
+**Symptoms:**
+```
+Telegram configured, not enabled yet.
+```
+
+**Cause:** Bot token is set but `channels.telegram.enabled` is not true.
+
+**Resolution:**
+- Run `moltbot doctor --fix --yes` to auto-enable
+- Or add to config: `channels: { telegram: { enabled: true } }`
+- For Railway: The startup command should include `doctor --fix`
+
 ### Bot Not Responding
 
 1. **Check logs**: `moltbot logs --follow`
