@@ -32,6 +32,10 @@ RUN pnpm ui:build
 
 ENV NODE_ENV=production
 
+# Create /data directory for Railway volume mount and set ownership
+# This must be done before switching to non-root user
+RUN mkdir -p /data && chown -R node:node /data
+
 # Security hardening: Run as non-root user
 # The node:22-bookworm image includes a 'node' user (uid 1000)
 # This reduces the attack surface by preventing container escape via root privileges
