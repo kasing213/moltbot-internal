@@ -2,6 +2,6 @@
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "sh -c 'node dist/index.js onboard --non-interactive --accept-risk --auth-choice openrouter-api-key --skip-daemon --skip-channels --skip-skills --skip-health --skip-ui && node dist/index.js doctor --fix --yes && node dist/index.js gateway --bind lan --port ${PORT:-8080} --token ${CLAWDBOT_GATEWAY_TOKEN}'"
+startCommand = "sh -c 'node dist/index.js onboard --non-interactive --accept-risk --auth-choice openrouter-api-key --skip-daemon --skip-channels --skip-skills --skip-health --skip-ui && node dist/index.js doctor --fix --yes && node dist/index.js config set gateway.controlUi.allowInsecureAuth true && node dist/index.js gateway --bind lan --port ${PORT:-8080} --token ${CLAWDBOT_GATEWAY_TOKEN}'"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
