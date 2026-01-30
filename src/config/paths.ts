@@ -220,3 +220,19 @@ export function resolveGatewayPort(
   }
   return DEFAULT_GATEWAY_PORT;
 }
+
+/**
+ * Resolve trusted proxy addresses from environment variable or config.
+ * Environment variable CLAWDBOT_TRUSTED_PROXIES takes precedence (comma-separated list).
+ * Supports both exact IPs and CIDR notation (e.g., "100.64.0.0/10").
+ */
+export function resolveTrustedProxies(
+  cfg?: MoltbotConfig,
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  const envRaw = env.CLAWDBOT_TRUSTED_PROXIES?.trim();
+  if (envRaw) {
+    return envRaw.split(",").map((ip) => ip.trim()).filter(Boolean);
+  }
+  return cfg?.gateway?.trustedProxies ?? [];
+}

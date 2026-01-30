@@ -25,6 +25,7 @@ import { isGatewayCliClient, isWebchatClient } from "../../../utils/message-chan
 import type { ResolvedGatewayAuth } from "../../auth.js";
 import { authorizeGatewayConnect, isLocalDirectRequest } from "../../auth.js";
 import { loadConfig } from "../../../config/config.js";
+import { resolveTrustedProxies } from "../../../config/paths.js";
 import { buildDeviceAuthPayload } from "../../device-auth.js";
 import { isLoopbackAddress, isTrustedProxyAddress, resolveGatewayClientIp } from "../../net.js";
 import { resolveNodeCommandAllowlist } from "../../node-command-policy.js";
@@ -190,7 +191,7 @@ export function attachGatewayWsMessageHandler(params: {
   } = params;
 
   const configSnapshot = loadConfig();
-  const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
+  const trustedProxies = resolveTrustedProxies(configSnapshot);
   const clientIp = resolveGatewayClientIp({ remoteAddr, forwardedFor, realIp, trustedProxies });
 
   // If proxy headers are present but the remote address isn't trusted, don't treat

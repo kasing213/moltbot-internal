@@ -48,10 +48,60 @@ function parseRealIp(realIp?: string): string | undefined {
   return normalizeIp(stripOptionalPort(raw));
 }
 
+/**
+ * Parse a CIDR notation string (e.g., "100.64.0.0/10") into base IP and prefix length.
+ * Returns null if not valid CIDR notation.
+ */
+function parseCidr(cidr: string): { ip: string; prefixLen: number } | null {
+  const parts = cidr.split("/");
+  if (parts.length !== 2) return null;
+  const ip = parts[0];
+  const prefixLen = parseInt(parts[1] ?? "", 10);
+  if (!ip || Number.isNaN(prefixLen) || prefixLen < 0 || prefixLen > 32) return null;
+  if (!isValidIPv4(ip)) return null;
+  return { ip, prefixLen };
+}
+
+/**
+ * Convert an IPv4 address string to a 32-bit integer.
+ */
+function ipv4ToInt(ip: string): number {
+  const parts = ip.split(".").map((p) => parseInt(p, 10));
+  if (parts.length !== 4) return 0;
+  return ((parts[0] ?? 0) << 24) | ((parts[1] ?? 0) << 16) | ((parts[2] ?? 0) << 8) | (parts[3] ?? 0);
+}
+
+/**
+ * Check if an IP address falls within a CIDR range.
+ */
+function ipInCidr(ip: string, cidr: { ip: string; prefixLen: number }): boolean {
+  const ipInt = ipv4ToInt(ip) >>> 0; // unsigned
+  const cidrInt = ipv4ToInt(cidr.ip) >>> 0;
+  const mask = cidr.prefixLen === 0 ? 0 : (~0 << (32 - cidr.prefixLen)) >>> 0;
+  return (ipInt & mask) === (cidrInt & mask);
+}
+
+/**
+ * Check if a proxy entry matches an IP address.
+ * Supports both exact IP matching and CIDR notation (e.g., "100.64.0.0/10").
+ */
+function proxyEntryMatches(ip: string, proxyEntry: string): boolean {
+  const normalizedEntry = normalizeIp(proxyEntry);
+
+  // Try CIDR match first
+  const cidr = parseCidr(proxyEntry);
+  if (cidr) {
+    return ipInCidr(ip, cidr);
+  }
+
+  // Fall back to exact match
+  return normalizedEntry === ip;
+}
+
 export function isTrustedProxyAddress(ip: string | undefined, trustedProxies?: string[]): boolean {
   const normalized = normalizeIp(ip);
   if (!normalized || !trustedProxies || trustedProxies.length === 0) return false;
-  return trustedProxies.some((proxy) => normalizeIp(proxy) === normalized);
+  return trustedProxies.some((proxy) => proxyEntryMatches(normalized, proxy));
 }
 
 export function resolveGatewayClientIp(params: {

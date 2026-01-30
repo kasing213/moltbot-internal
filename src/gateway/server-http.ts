@@ -10,6 +10,7 @@ import type { WebSocketServer } from "ws";
 import { handleA2uiHttpRequest } from "../canvas-host/a2ui.js";
 import type { CanvasHostHandler } from "../canvas-host/server.js";
 import { loadConfig } from "../config/config.js";
+import { resolveTrustedProxies } from "../config/paths.js";
 import type { createSubsystemLogger } from "../logging/subsystem.js";
 import { handleSlackHttpRequest } from "../slack/http/index.js";
 import { resolveAgentAvatar } from "../agents/identity-avatar.js";
@@ -246,7 +247,7 @@ export function createGatewayHttpServer(opts: {
 
     try {
       const configSnapshot = loadConfig();
-      const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
+      const trustedProxies = resolveTrustedProxies(configSnapshot);
       if (await handleHooksRequest(req, res)) return;
       if (
         await handleToolsInvokeHttpRequest(req, res, {
