@@ -113,7 +113,7 @@ export async function setVeniceApiKey(key: string, agentDir?: string) {
 }
 
 export const ZAI_DEFAULT_MODEL_REF = "zai/glm-4.7";
-export const OPENROUTER_DEFAULT_MODEL_REF = "openrouter/auto";
+export const OPENROUTER_DEFAULT_MODEL_REF = "openrouter/meta-llama/llama-3.3-70b-instruct:free";
 export const VERCEL_AI_GATEWAY_DEFAULT_MODEL_REF = "vercel-ai-gateway/anthropic/claude-opus-4.5";
 
 export async function setZaiApiKey(key: string, agentDir?: string) {
