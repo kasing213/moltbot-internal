@@ -94,3 +94,95 @@ Download a backup at:
 - `https://<your-railway-domain>/setup/export`
 
 This exports your Moltbot state + workspace so you can migrate to another host without losing config or memory.
+
+## Troubleshooting
+
+### WebSocket error 1008: "pairing required" or "token mismatch"
+
+This happens when the Control UI can't authenticate with the gateway. Railway's reverse proxy
+setup requires special configuration.
+
+**Fix:** The `railway.toml` start command automatically enables `gateway.controlUi.allowInsecureAuth`
+which allows token-only authentication without device pairing.
+
+If you still see this error:
+
+1. **Clear browser localStorage:**
+   - Open DevTools (F12) → Application → Local Storage
+   - Delete entries for your Railway domain
+   - Refresh the page
+
+2. **Use tokenized URL:**
+   ```
+   https://<your-railway-domain>/moltbot?token=YOUR_CLAWDBOT_GATEWAY_TOKEN
+   ```
+
+3. **Verify token matches:**
+   - The token in the URL must exactly match `CLAWDBOT_GATEWAY_TOKEN` in Railway Variables
+
+### Telegram 409 conflict: "terminated by other getUpdates request"
+
+Only one bot instance can poll Telegram at a time. This error appears when:
+
+- A previous Railway deployment is still running
+- A local development instance is polling the same bot
+- Multiple Railway replicas are configured
+
+**Fix:**
+
+1. Ensure Railway service has exactly **1 replica** (Settings → Scaling)
+2. Stop any local `moltbot gateway` instances
+3. For production, consider switching to **webhook mode**:
+   ```json
+   {
+     "channels": {
+       "telegram": {
+         "webhookUrl": "https://<your-railway-domain>/telegram-webhook"
+       }
+     }
+   }
+   ```
+
+### Health check failing
+
+If Railway shows health check failures:
+
+1. Verify `PORT=8080` is set in Variables
+2. Verify HTTP Proxy is enabled on port `8080`
+3. Check deployment logs for startup errors
+
+### Control UI shows "Schema unavailable"
+
+This usually means the WebSocket connection failed. Follow the "pairing required" fix above.
+
+## Complete variable reference
+
+| Variable | Required | Example | Description |
+|----------|----------|---------|-------------|
+| `SETUP_PASSWORD` | Yes | `mysecretpass` | Password for `/setup` wizard |
+| `PORT` | Yes | `8080` | Must match HTTP Proxy port |
+| `CLAWDBOT_GATEWAY_TOKEN` | Recommended | `openssl rand -hex 32` | Gateway auth token |
+| `CLAWDBOT_STATE_DIR` | Recommended | `/data/.clawdbot` | Persistent config location |
+| `CLAWDBOT_WORKSPACE_DIR` | Recommended | `/data/workspace` | Agent workspace location |
+| `CLAWDBOT_TRUSTED_PROXIES` | Optional | `10.0.0.0/8,172.16.0.0/12` | Railway internal proxy CIDRs |
+| `TELEGRAM_BOT_TOKEN` | Optional | `123:ABC...` | Telegram bot token |
+| `OPENROUTER_API_KEY` | Optional | `sk-or-...` | OpenRouter API key |
+
+## railway.toml reference
+
+The start command runs three steps:
+
+1. **Onboard:** Non-interactive setup with OpenRouter
+2. **Doctor:** Auto-fix configuration issues
+3. **Config:** Enable `allowInsecureAuth` for Control UI
+4. **Gateway:** Start with LAN binding and token auth
+
+```toml
+[build]
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "sh -c 'node dist/index.js onboard ... && node dist/index.js doctor --fix --yes && node dist/index.js config set gateway.controlUi.allowInsecureAuth true && node dist/index.js gateway --bind lan --port ${PORT:-8080} --token ${CLAWDBOT_GATEWAY_TOKEN}'"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+```
