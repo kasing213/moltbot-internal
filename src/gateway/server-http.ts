@@ -235,6 +235,15 @@ export function createGatewayHttpServer(opts: {
     // Don't interfere with WebSocket upgrades; ws handles the 'upgrade' event.
     if (String(req.headers.upgrade ?? "").toLowerCase() === "websocket") return;
 
+    // Health check endpoint for load balancers / container orchestrators (e.g., Railway, k8s)
+    const pathname = req.url?.split("?")[0] ?? "/";
+    if (pathname === "/health" || pathname === "/healthz") {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.end(JSON.stringify({ status: "ok" }));
+      return;
+    }
+
     try {
       const configSnapshot = loadConfig();
       const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
