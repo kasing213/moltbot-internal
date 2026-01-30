@@ -1,3 +1,19 @@
+/**
+ * Retry Policy Configuration
+ *
+ * This module provides channel-specific retry runners for Discord and Telegram.
+ * Retry runners wrap API calls with exponential backoff, jitter, and rate-limit
+ * awareness to handle transient failures gracefully.
+ *
+ * Key Features:
+ * - Exponential backoff: delay doubles after each attempt
+ * - Jitter: random variation prevents thundering herd
+ * - Rate-limit awareness: respects Telegram's retry_after header
+ * - Configurable via channel config (e.g., channels.telegram.retry)
+ *
+ * @see docs/error-handling.md for full documentation
+ */
+
 import { RateLimitError } from "@buape/carbon";
 
 import { formatErrorMessage } from "./errors.js";
@@ -5,13 +21,19 @@ import { type RetryConfig, resolveRetryConfig, retryAsync } from "./retry.js";
 
 export type RetryRunner = <T>(fn: () => Promise<T>, label?: string) => Promise<T>;
 
+/** Discord retry defaults - used for Discord API rate limits */
 export const DISCORD_RETRY_DEFAULTS = {
-  attempts: 3,
-  minDelayMs: 500,
-  maxDelayMs: 30_000,
-  jitter: 0.1,
+  attempts: 3,        // Max retry attempts before giving up
+  minDelayMs: 500,    // Initial delay (doubles each attempt)
+  maxDelayMs: 30_000, // Maximum delay cap
+  jitter: 0.1,        // 10% random variation to prevent thundering herd
 };
 
+/**
+ * Telegram retry defaults - used for Bot API transient errors.
+ * Slightly faster initial delay than Discord since Telegram rate limits
+ * are typically shorter.
+ */
 export const TELEGRAM_RETRY_DEFAULTS = {
   attempts: 3,
   minDelayMs: 400,
@@ -19,6 +41,10 @@ export const TELEGRAM_RETRY_DEFAULTS = {
   jitter: 0.1,
 };
 
+/**
+ * Pattern matching errors that should trigger a retry.
+ * Covers: rate limits (429), timeouts, connection issues, service unavailability.
+ */
 const TELEGRAM_RETRY_RE = /429|timeout|connect|reset|closed|unavailable|temporarily/i;
 
 function getTelegramRetryAfterMs(err: unknown): number | undefined {
@@ -68,6 +94,29 @@ export function createDiscordRetryRunner(params: {
     });
 }
 
+/**
+ * Creates a retry runner for Telegram Bot API calls.
+ *
+ * The runner wraps async functions with automatic retry on transient errors:
+ * - 429 rate limits (respects retry_after from Telegram)
+ * - Network timeouts and connection resets
+ * - Temporary service unavailability
+ *
+ * @example
+ * ```typescript
+ * const retry = createTelegramRetryRunner({ verbose: true });
+ * const result = await retry(
+ *   () => api.sendMessage(chatId, text),
+ *   "sendMessage"
+ * );
+ * ```
+ *
+ * @param params.retry - Override retry config for this runner
+ * @param params.configRetry - Channel config retry settings (from channels.telegram.retry)
+ * @param params.verbose - Log retry attempts to console
+ * @param params.shouldRetry - Custom predicate to determine if error is retryable
+ * @returns A retry runner function that wraps async operations
+ */
 export function createTelegramRetryRunner(params: {
   retry?: RetryConfig;
   configRetry?: RetryConfig;
@@ -78,6 +127,8 @@ export function createTelegramRetryRunner(params: {
     ...params.configRetry,
     ...params.retry,
   });
+
+  // Combine custom shouldRetry with default pattern matching
   const shouldRetry = params.shouldRetry
     ? (err: unknown) => params.shouldRetry?.(err) || TELEGRAM_RETRY_RE.test(formatErrorMessage(err))
     : (err: unknown) => TELEGRAM_RETRY_RE.test(formatErrorMessage(err));
@@ -87,7 +138,7 @@ export function createTelegramRetryRunner(params: {
       ...retryConfig,
       label,
       shouldRetry,
-      retryAfterMs: getTelegramRetryAfterMs,
+      retryAfterMs: getTelegramRetryAfterMs, // Respects Telegram's rate limit headers
       onRetry: params.verbose
         ? (info) => {
             const maxRetries = Math.max(1, info.maxAttempts - 1);

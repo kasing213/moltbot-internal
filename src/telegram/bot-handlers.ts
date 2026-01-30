@@ -1,4 +1,26 @@
 // @ts-nocheck
+/**
+ * Telegram Bot Handlers
+ *
+ * This module registers grammY event handlers for Telegram updates:
+ * - Message handler (text, media, stickers)
+ * - Callback query handler (inline button presses)
+ * - Message reaction handler (emoji reactions)
+ * - Group migration handler (group → supergroup)
+ *
+ * Error Handling Strategy:
+ * Each handler wraps its logic in try/catch to prevent errors from crashing
+ * the bot or affecting other updates. Errors are logged via runtime.error()
+ * with the handler name for context.
+ *
+ * Recovery Patterns:
+ * - Store read failures: Default to empty array (processing continues)
+ * - Media resolution failures: Skip media, process text only
+ * - Media group failures: Isolated per-group (other groups unaffected)
+ *
+ * @see docs/error-handling.md for full documentation
+ */
+
 import { hasControlCommand } from "../auto-reply/command-detection.js";
 import {
   createInboundDebouncer,
@@ -105,11 +127,18 @@ export const registerTelegramHandlers = ({
         messageIdOverride ? { messageIdOverride } : undefined,
       );
     },
+    // Error callback: logs failures but doesn't crash - other messages continue processing
     onError: (err) => {
       runtime.error?.(danger(`telegram debounce flush failed: ${String(err)}`));
     },
   });
 
+  /**
+   * Processes a buffered media group (multiple images sent together).
+   * Error handling: Each media group is isolated - failures here don't
+   * affect other groups or messages. Individual media resolution failures
+   * are skipped (only successfully resolved media is included).
+   */
   const processMediaGroup = async (entry: MediaGroupEntry) => {
     try {
       entry.messages.sort((a, b) => a.msg.message_id - b.msg.message_id);
@@ -133,6 +162,7 @@ export const registerTelegramHandlers = ({
         }
       }
 
+      // Graceful fallback: if store read fails, use empty allowlist so processing continues
       const storeAllowFrom = await readTelegramAllowFromStore().catch(() => []);
       await processMessage(primaryEntry.ctx, allMedia, storeAllowFrom);
     } catch (err) {
